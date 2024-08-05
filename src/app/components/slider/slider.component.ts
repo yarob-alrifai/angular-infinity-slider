@@ -42,7 +42,7 @@ export class SliderComponent implements OnInit {
   isWinner = signal<boolean>(false); //Use it in the dialog
   dialogTitle = signal<string>(''); //Dialog title we will change it then
   showDialog = signal<boolean>(false); //To show dialog and show message when stop
-
+enableButton = signal(true)
   @ViewChild('dialog') dialog!: ElementRef<HTMLDialogElement>; //Get to the dialog
   @ViewChild('carouselList', { static: true }) carouselList!: ElementRef; //Get to the carousel list
 
@@ -140,6 +140,9 @@ export class SliderComponent implements OnInit {
   startSlider() {
     console.log('================================================');
     console.log('Slider started');
+    this.enableButton.set(false)
+    this.selectedItemIndex.set(-1)
+    this.isWinner.set(false)
     this.isRunning.set(true);
     this.selectedItemIndex.set(this.getRandomIndex()); //Get random index from our items
     console.log('Selected item index:', this.selectedItemIndex());
@@ -207,6 +210,7 @@ export class SliderComponent implements OnInit {
           this.dialogTitle.set(this.isWinner() ? 'Congratulations!' : 'Oops!');
           this.showDialog.set(true);
           this.openDialog();
+          this.enableButton.set(true)
           // fire Reset items array. Put in items array just 50 items and delete the old value
           this.items.set(
             this.helper.slice(

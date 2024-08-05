@@ -20,7 +20,7 @@
   </div>
   <div class="carousel__controls"></div>
   <div class="button-container">
-    <button (click)="startSlider()">Start</button>
+    <button (click)="startSlider()" [disabled]="!enableButton()" [ngClass]="{'disabled': !enableButton()}">Start</button>
   </div>
 </div>
 
