@@ -1,0 +1,43 @@
+<div class="carousel ">
+  <div class="carousel__scene ">
+    <ul class="carousel__list" #carouselList>
+      @if(items()){
+      @for (item of items(); track $index; let i = $index) {
+      <li class="carousel__cell">
+        <div class="carousel__item" [class.bigger]="isCenterItem(i)">
+          {{ item.key }}
+        </div>
+      </li>
+      }
+      }
+      @else {
+      <li>There are no Items !</li>
+      }
+    </ul>
+  </div>
+  <div class="arrow-container">
+    <div class="arrow"></div>
+  </div>
+  <div class="carousel__controls"></div>
+  <div class="button-container">
+    <button (click)="startSlider()">Start</button>
+  </div>
+</div>
+
+
+<!-- green Dialog to display the result -->
+<dialog #dialog class="dialog" [class.show]="showDialog()">
+  <h1>{{ dialogTitle() }}</h1>
+  <p>The index for your selected item: {{ selectedItemIndex() }}</p>
+  @if(isWinner()){
+  <p>Congratulations! You've selected the winning block.</p>
+
+  }
+  @else {
+  <p>Please try again.</p>
+
+  }
+  <div class="button-container">
+    <button (click)="closeDialog()" style="width:8rem;">Close</button>
+  </div>
+</dialog>
