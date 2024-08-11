@@ -20,7 +20,7 @@
   </div>
   <div class="carousel__controls"></div>
   <div class="button-container">
-    <button (click)="startSlider()" [disabled]="!enableButton()" [ngClass]="{'disabled': !enableButton()}">Start</button>
+    <button [disabled]="!enableButton()" [ngClass]="{'disabled': !enableButton()}" (click)="start()">Start</button>
   </div>
 </div>
 
@@ -41,4 +41,7 @@
     <button (click)="closeDialog()" style="width:8rem;">Close</button>
   </div>
 </dialog>
+
+
+
 
