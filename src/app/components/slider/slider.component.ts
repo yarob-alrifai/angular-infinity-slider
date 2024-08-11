@@ -6,8 +6,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 
 interface Item {
   key: number;
@@ -16,45 +15,39 @@ interface Item {
   selector: 'app-slider',
   templateUrl: './slider.component.html',
   styleUrls: ['./slider.component.css'],
+  imports: [NgClass],
   standalone: true,
-  imports: [CommonModule],
-  animations: [],
 })
 export class SliderComponent implements OnInit {
-  // green =====================================def=====================================
-  // orange we can change the next as we want
+  // fire =====================================def=====================================
 
-  transformValue = signal('translateX(0)');
-  itemsNumber = signal(10); //Items number
+  differenceBetweenRightAndSelected = signal(0);
+  itemsNumber = signal(50); //Items number
   visibleItemsCount = signal(5); // Number of visible items on the screen, we can change it as we want
-  winningBlock = signal(5); //Winning block
-  // orange we can change the prev as we want
-  // blue====our data
+  winningBlock = signal(15); //Winning block
+  endSlicee = signal(this.visibleItemsCount() + 2);
+
   ourDate = signal<Item[]>(
     Array.from({ length: this.itemsNumber() }, (_, i) => ({ key: i + 1 }))
   ); //Gerate our items
   items = signal<Item[]>([]); //To display on the screen
-  data = [...this.ourDate()]; //We will use it to add items every time to our items array
-  helper = this.ourDate(); //For reset the items when stop
-  // blue====our data
   currentIndex = signal<number>(Math.floor(this.visibleItemsCount() / 2)); //Started index
   selectedItemIndex = signal(-1); //Random slected item to stop on it
   isWinner = signal<boolean>(false); //Use it in the dialog
   dialogTitle = signal<string>(''); //Dialog title we will change it then
   showDialog = signal<boolean>(false); //To show dialog and show message when stop
   enableButton = signal(true);
-
+  index = signal(this.currentIndex());
+  counterForChangeSpeed = signal(0);
+  counterForDoOneCycle = signal(0);
+  stepSpeed = signal(0.05);
+  maxSpeed = signal(0.1);
+  minSpeed = signal(0.6);
+  speed = signal(this.minSpeed());
+  selectedItemOffset = signal(0);
   dialog = viewChild<ElementRef>('dialog'); //Get to the dialog
   carouselList = viewChild<ElementRef>('carouselList'); //Get to the carousel list
-  speed = signal(0.5);
-  index = signal(2);
-  counter = signal(0);
-  howMany = signal(0);
-  stepSpeed = signal(0.1);
-  maxSpeed = signal(0.2);
-  minSpeed = signal(0.5);
 
-  selectedItemOffset = signal(0);
   // fire =====================================def=====================================
 
   constructor(private renderer: Renderer2) {}
@@ -63,48 +56,14 @@ export class SliderComponent implements OnInit {
     this.initCarousel();
   }
 
-  initCarousel() {
-    let endSlicee = signal(this.visibleItemsCount() + 2);
-    this.items.set(this.ourDate().slice(0, endSlicee()));
-    this.data.splice(0, endSlicee());
-
+  private initCarousel() {
+    this.setUpItems();
     this.applyStyles();
     this.firstRotateCarousel();
   }
 
-  firstRotateCarousel() {
-    const transformValue = `translateX(${
-      (-(this.currentIndex() - Math.floor(this.visibleItemsCount() / 2)) *
-        100) /
-      this.visibleItemsCount()
-    }%)`;
-    this.renderer.setStyle(
-      this.carouselList()?.nativeElement,
-      'transform',
-      transformValue
-    );
-  }
-
-  alignToSelectedItem() {
-    this.incrementIndex();
-    this.shiftAndAppendItem();
-    this.applyStyles();
-    this.animateCarousel();
-    this.scheduleAlignment();
-  }
-
-  private incrementIndex() {
-    this.index.update((index) => index + 1);
-  }
-
-  private shiftAndAppendItem() {
-    const item = this.data.shift();
-    if (this.data.length === 0) {
-      this.data.push(...this.helper);
-    }
-    if (item) {
-      this.items.update((items) => [...items, item]);
-    }
+  private setUpItems() {
+    this.items.set(this.ourDate().slice(0, this.endSlicee()));
   }
 
   private applyStyles() {
@@ -120,44 +79,95 @@ export class SliderComponent implements OnInit {
     });
   }
 
+  private firstRotateCarousel() {
+    const transformValue = `translateX(${
+      (-(this.currentIndex() - Math.floor(this.visibleItemsCount() / 2)) *
+        100) /
+      this.visibleItemsCount()
+    }%)`;
+    this.renderer.setStyle(
+      this.carouselList()?.nativeElement,
+      'transform',
+      transformValue
+    );
+  }
+
+  private alignToSelectedItem() {
+    this.incrementIndex();
+    this.shiftAndAppendItem();
+    this.applyStyles();
+    this.animateCarousel();
+    this.scheduleAlignment();
+  }
+
+  private incrementIndex() {
+    this.index.update((index) => index + 1);
+  }
+
+  private shiftAndAppendItem() {
+    const item = this.ourDate()[(this.index() + 4) % this.itemsNumber()];
+    if (item) {
+      this.items.update((items) => [...items, item]);
+    }
+  }
+
   private animateCarousel() {
     const transformValue = this.calculateTransformValue(
       this.currentIndex() + 1
     );
     this.applyTransform(transformValue);
-    setTimeout(() => {
-      const resetTransformValue = this.calculateTransformValue(
-        this.currentIndex()
-      );
-      this.resetTransform(resetTransformValue);
-      this.removeFirstItem();
-    }, this.speed() * 1000);
-  }
 
-  private calculateDifference(): number {
-    const index = this.index();
-    const nearestLowerMultipleOf10 = Math.floor(index / 10) * 10;
-    const val = nearestLowerMultipleOf10;
+    const start = performance.now();
+    const duration = this.speed() * 1000;
 
-    return Math.round((this.selectedItemIndex() + val - index) / 4);
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        const resetTransformValue = this.calculateTransformValue(
+          this.currentIndex()
+        );
+        this.resetTransform(resetTransformValue);
+        this.removeFirstItem();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
   }
 
   private scheduleAlignment() {
-    setTimeout(() => {
-      const difference = this.calculateDifference();
-      if (this.counter() === difference) {
-        this.counter.set(0);
-        this.speed.update((speed) =>
-          Math.min(this.minSpeed(), speed + this.stepSpeed())
-        );
-      }
-      this.counter.update((counter) => counter + 1);
+    const start = performance.now();
+    const duration = this.speed() * 1500;
 
-      if (this.index() !== this.selectedItemOffset()) {
-        console.log('index --- selected offset ' + this.index () +'---' + this.selectedItemOffset())
-        this.alignToSelectedItem();
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        if (
+          this.counterForChangeSpeed() ===
+          this.differenceBetweenRightAndSelected()
+        ) {
+          this.counterForChangeSpeed.set(0);
+          this.speed.update((speed) =>
+            Math.min(this.minSpeed(), speed + this.stepSpeed())
+          );
+        }
+        this.counterForChangeSpeed.update((counter) => counter + 1);
+
+        if (this.index() !== this.selectedItemOffset()) {
+          this.alignToSelectedItem();
+        } else {
+          this.showDialog.set(true);
+          this.openDialog();
+          this.enableButton.set(true);
+        }
+      } else {
+        requestAnimationFrame(animate);
       }
-    }, this.speed() * 1500);
+    };
+    requestAnimationFrame(animate);
   }
 
   private calculateTransformValue(index: number): string {
@@ -202,57 +212,79 @@ export class SliderComponent implements OnInit {
     this.items().shift();
   }
 
-  // red ============================================
-
-  start() {
+  private inItVariable() {
     this.index.update((index) => index % this.itemsNumber());
-    this.index.update((index) => index + 1);
-    this.howMany.set(0);
-    this.speed.set(0.5)
+    this.incrementIndex();
+    this.enableButton.set(false);
+    this.counterForDoOneCycle.set(0);
+    this.speed.set(0.5);
+    this.counterForChangeSpeed.set(0);
     this.selectedItemIndex.set(this.getRandomIndex());
+    this.isWinner.set(this.selectedItemIndex() === this.winningBlock());
+    this.dialogTitle.set(this.isWinner() ? 'Congratulations!' : 'Oops!');
+    this.selectedItemOffset.set(this.selectedItemIndex());
     console.log('selected item: ' + this.selectedItemIndex());
+  }
+
+   start() {
+    this.inItVariable();
     this.shiftAndAppendItem();
     this.applyStyles();
     this.performFullRotation();
   }
 
   private scheduleNextRotation() {
+    const start = performance.now();
+    const duration = this.speed() * 1500;
 
-    setTimeout(() => {
-      if (this.howMany() === this.itemsNumber()) {
-        console.log('how many ' + this.howMany());
-        this.counter.set(0);
-        this.selectedItemOffset.set(   this.selectedItemIndex() + Math.floor(this.index() / 10) * 10  );
-        console.log('selected item index offset ' + this.selectedItemOffset());
-        this.index.update(index =>  index % this.itemsNumber());
-        this.alignToSelectedItem();
-        return;
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        if (this.counterForDoOneCycle() === this.itemsNumber()) {
+          this.counterForChangeSpeed.set(0);
+          this.index.update((index) => index % this.itemsNumber());
+          if (this.selectedItemIndex() <= this.index()) {
+            this.selectedItemOffset.set(
+              this.selectedItemIndex() + this.itemsNumber()
+            );
+          }
+          this.differenceBetweenRightAndSelected.set(
+            Math.round((this.selectedItemOffset() - this.index()) / 10)
+          );
+          this.alignToSelectedItem();
+          return;
+        }
+
+        this.counterForDoOneCycle.update((i) => i + 1);
+
+        if (
+          this.counterForChangeSpeed() === Math.round(this.itemsNumber() / 10)
+        ) {
+          this.counterForChangeSpeed.set(0);
+          this.speed.update((i) =>
+            Math.max(this.maxSpeed(), i - this.stepSpeed())
+          );
+        }
+
+        this.counterForChangeSpeed.update((i) => i + 1);
+        this.move();
+      } else {
+        requestAnimationFrame(animate);
       }
-      this.howMany.update((i) => i + 1);
-      if (this.counter() === Math.round(this.itemsNumber() / 4)) {
-        this.counter.set(0);
-        this.speed.update((i) =>
-          Math.max(this.maxSpeed(), i - this.stepSpeed())
-        );
-      }
-      this.counter.update((i) => i + 1);
-      this.move();
-    }, this.speed() * 1500);
+    };
 
-
-
+    requestAnimationFrame(animate);
   }
 
-  move() {
-    this.index.update((index) => index + 1);
+  private move() {
+    this.incrementIndex();
     this.shiftAndAppendItem();
     this.applyStyles();
     this.performFullRotation();
   }
 
-  // green =====================================
-
-  performFullRotation() {
+  private performFullRotation() {
     const transformValue = this.calculateTransformValue(
       this.currentIndex() + 1
     );
@@ -262,25 +294,34 @@ export class SliderComponent implements OnInit {
   }
 
   private scheduleTransformReset() {
-    setTimeout(() => {
-      const resetTransformValue = this.calculateTransformValue(
-        this.currentIndex()
-      );
-      this.resetTransform(resetTransformValue);
-      this.removeFirstItem();
-    }, this.speed() * 1000);
+    const start = performance.now();
+    const duration = this.speed() * 1000;
+
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        const resetTransformValue = this.calculateTransformValue(
+          this.currentIndex()
+        );
+        this.resetTransform(resetTransformValue);
+        this.removeFirstItem();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
   }
 
-  getRandomIndex(): number {
+  private getRandomIndex(): number {
     return (
       (Math.floor(Math.random() * 10) + this.winningBlock()) %
       this.itemsNumber()
     );
   }
 
-  // red
-
-  isCenterItem(index: number): boolean {
+   isCenterItem(index: number): boolean {
     const centerIndex = this.calculateCenterIndex();
     const currentCenterIndex = this.getCurrentCenterIndex();
     return this.isItemAtCenter(index, currentCenterIndex, centerIndex);
@@ -296,12 +337,12 @@ export class SliderComponent implements OnInit {
     if (this.visibleItemsCount() < 5) {
       return (
         (this.currentIndex() - 3 + this.calculateCenterIndex()) %
-        this.helper.length
+        this.ourDate().length
       );
     } else {
       return (
         (this.currentIndex() - 2 + this.calculateCenterIndex()) %
-        this.helper.length
+        this.ourDate().length
       );
     }
   }
@@ -317,14 +358,12 @@ export class SliderComponent implements OnInit {
     return index === currentCenterIndex;
   }
 
-  // red
-
-  closeDialog() {
+   closeDialog() {
     this.showDialog.set(false);
     const dialog = this.dialog()?.nativeElement;
     dialog.close();
   }
-  openDialog() {
+   openDialog() {
     const dialog = this.dialog()?.nativeElement;
     dialog.showModal();
   }
