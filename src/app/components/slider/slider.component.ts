@@ -32,19 +32,19 @@ export class SliderComponent implements OnInit {
   ); //Gerate our items
   items = signal<Item[]>([]); //To display on the screen
   currentIndex = signal<number>(Math.floor(this.visibleItemsCount() / 2)); //Started index
-  selectedItemIndex = signal(-1); //Random slected item to stop on it
+  selectedItemIndex = signal<number>(-1); //Random slected item to stop on it
   isWinner = signal<boolean>(false); //Use it in the dialog
   dialogTitle = signal<string>(''); //Dialog title we will change it then
   showDialog = signal<boolean>(false); //To show dialog and show message when stop
-  enableButton = signal(true);
-  index = signal(this.currentIndex());
-  counterForChangeSpeed = signal(0);
-  counterForDoOneCycle = signal(0);
-  stepSpeed = signal(0.05);
-  maxSpeed = signal(0.1);
-  minSpeed = signal(0.6);
-  speed = signal(this.minSpeed());
-  selectedItemOffset = signal(0);
+  enableButton = signal<boolean>(true);
+  index = signal<number>(this.currentIndex());
+  counterForChangeSpeed = signal<number>(0);
+  counterForDoOneCycle = signal<number>(0);
+  stepSpeed = signal<number>(0.05);
+  maxSpeed = signal<number>(0.1);
+  minSpeed = signal<number>(0.6);
+  currentSpeed = signal<number>(this.minSpeed());
+  selectedItemOffset = signal<number>(0);
   dialog = viewChild<ElementRef>('dialog'); //Get to the dialog
   carouselList = viewChild<ElementRef>('carouselList'); //Get to the carousel list
 
@@ -55,7 +55,7 @@ export class SliderComponent implements OnInit {
   ngOnInit() {
     this.initCarousel();
   }
-
+  // green initial functions  =================================initial functions =========================
   private initCarousel() {
     this.setUpItems();
     this.applyStyles();
@@ -92,16 +92,27 @@ export class SliderComponent implements OnInit {
     );
   }
 
-  private alignToSelectedItem() {
-    this.incrementIndex();
+  // green work functions  =================================work functions =========================
+
+  start() {
+    this.inItVariable();
     this.shiftAndAppendItem();
     this.applyStyles();
-    this.animateCarousel();
-    this.scheduleAlignment();
+    this.performFullRotation();
   }
 
-  private incrementIndex() {
-    this.index.update((index) => index + 1);
+  private inItVariable() {
+    this.index.update((index) => index % this.itemsNumber());
+    this.incrementIndex();
+    this.enableButton.set(false);
+    this.counterForDoOneCycle.set(0);
+    this.currentSpeed.set(0.5);
+    this.counterForChangeSpeed.set(0);
+    this.selectedItemIndex.set(this.getRandomIndex());
+    this.isWinner.set(this.selectedItemIndex() === this.winningBlock());
+    this.dialogTitle.set(this.isWinner() ? 'Congratulations!' : 'Oops!');
+    this.selectedItemOffset.set(this.selectedItemIndex());
+    console.log('selected item: ' + this.selectedItemIndex());
   }
 
   private shiftAndAppendItem() {
@@ -111,63 +122,13 @@ export class SliderComponent implements OnInit {
     }
   }
 
-  private animateCarousel() {
+  private performFullRotation() {
     const transformValue = this.calculateTransformValue(
       this.currentIndex() + 1
     );
     this.applyTransform(transformValue);
-
-    const start = performance.now();
-    const duration = this.speed() * 1000;
-
-    const animate = (timestamp: number) => {
-      const elapsed = timestamp - start;
-
-      if (elapsed >= duration) {
-        const resetTransformValue = this.calculateTransformValue(
-          this.currentIndex()
-        );
-        this.resetTransform(resetTransformValue);
-        this.removeFirstItem();
-      } else {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }
-
-  private scheduleAlignment() {
-    const start = performance.now();
-    const duration = this.speed() * 1500;
-
-    const animate = (timestamp: number) => {
-      const elapsed = timestamp - start;
-
-      if (elapsed >= duration) {
-        if (
-          this.counterForChangeSpeed() ===
-          this.differenceBetweenRightAndSelected()
-        ) {
-          this.counterForChangeSpeed.set(0);
-          this.speed.update((speed) =>
-            Math.min(this.minSpeed(), speed + this.stepSpeed())
-          );
-        }
-        this.counterForChangeSpeed.update((counter) => counter + 1);
-
-        if (this.index() !== this.selectedItemOffset()) {
-          this.alignToSelectedItem();
-        } else {
-          this.showDialog.set(true);
-          this.openDialog();
-          this.enableButton.set(true);
-        }
-      } else {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
+    this.scheduleTransformReset();
+    this.scheduleNextRotation();
   }
 
   private calculateTransformValue(index: number): string {
@@ -186,13 +147,204 @@ export class SliderComponent implements OnInit {
     this.renderer.setStyle(
       this.carouselList()?.nativeElement,
       'transition',
-      `transform ${this.speed()}s ease-in-out`
+      `transform ${this.currentSpeed()}s ease-in-out`
     );
     this.renderer.setStyle(
       this.carouselList()?.nativeElement,
       'transform',
       transformValue
     );
+  }
+
+  private scheduleTransformReset() {
+    const start = performance.now();
+    const duration = this.currentSpeed() * 1000;
+
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        const resetTransformValue = this.calculateTransformValue(
+          this.currentIndex()
+        );
+        this.resetTransform(resetTransformValue);
+        this.removeFirstItem();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+
+  private scheduleNextRotation() {
+    const start = performance.now();
+    const duration = this.currentSpeed() * 1500;
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+      if (elapsed >= duration) {
+        this.handleEndOfRotation();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+
+  handleEndOfRotation() {
+    if (this.hasCompletedCycle()) {
+      this.resetCycle();
+
+      this.updateIndexForSelectedItem();
+      this.calculateDifferenceBetweenSelectedAndCurrent();
+      this.alignToSelectedItem();
+      return;
+    }
+    this.incrementCycleCounter();
+    this.adjustSpeedIfNecessary();
+    this.move();
+  }
+
+  private hasCompletedCycle(): boolean {
+    return this.counterForDoOneCycle() === this.itemsNumber();
+  }
+
+  private resetCycle() {
+    this.counterForChangeSpeed.set(0);
+    this.index.update((index) => index % this.itemsNumber());
+  }
+  private updateIndexForSelectedItem() {
+    if (this.selectedItemIndex() <= this.index()) {
+      this.selectedItemOffset.set(
+        this.selectedItemIndex() + this.itemsNumber()
+      );
+    }
+  }
+
+  private calculateDifferenceBetweenSelectedAndCurrent() {
+    this.differenceBetweenRightAndSelected.set(
+      Math.round((this.selectedItemOffset() - this.index()) / 10)
+    );
+  }
+
+  private alignToSelectedItem() {
+    this.incrementIndex();
+    this.shiftAndAppendItem();
+    this.applyStyles();
+    this.animateCarousel();
+    this.scheduleAlignment();
+  }
+
+  private incrementCycleCounter() {
+    this.counterForDoOneCycle.update((i) => i + 1);
+  }
+
+  private adjustSpeedIfNecessary() {
+    if (this.counterForChangeSpeed() === Math.round(this.itemsNumber() / 10)) {
+      this.counterForChangeSpeed.set(0);
+      this.currentSpeed.update((i) =>
+        Math.max(this.maxSpeed(), i - this.stepSpeed())
+      );
+    }
+    this.counterForChangeSpeed.update((i) => i + 1);
+  }
+
+  private move() {
+    this.incrementIndex();
+    this.shiftAndAppendItem();
+    this.applyStyles();
+    this.performFullRotation();
+  }
+
+  private incrementIndex() {
+    this.index.update((index) => index + 1);
+  }
+
+  private animateCarousel() {
+    const transformValue = this.calculateTransformValue(
+      this.currentIndex() + 1
+    );
+    this.applyTransform(transformValue);
+
+    const start = performance.now();
+    const duration = this.currentSpeed() * 1000;
+
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+
+      if (elapsed >= duration) {
+        const resetTransformValue = this.calculateTransformValue(
+          this.currentIndex()
+        );
+        this.resetTransform(resetTransformValue);
+        this.removeFirstItem();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+  private scheduleAlignment() {
+    const start = performance.now();
+    const duration = this.currentSpeed() * 1500;
+    const animate = (timestamp: number) => {
+      const elapsed = timestamp - start;
+      if (elapsed >= duration) {
+        this.handleSpeedAdjustment();
+        this.checkAlignmentOrEnd();
+      } else {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  private handleSpeedAdjustment() {
+    if (this.shouldAdjustSpeed()) {
+      this.resetSpeedCounter();
+      this.increaseSpeed();
+    }
+    this.incrementSpeedCounter();
+  }
+
+  private shouldAdjustSpeed(): boolean {
+    return (
+      this.counterForChangeSpeed() === this.differenceBetweenRightAndSelected()
+    );
+  }
+
+  private resetSpeedCounter() {
+    this.counterForChangeSpeed.set(0);
+  }
+
+  private increaseSpeed() {
+    this.currentSpeed.update((speed) =>
+      Math.min(this.minSpeed(), speed + this.stepSpeed())
+    );
+  }
+
+  private checkAlignmentOrEnd() {
+    if (this.isNotAlignedWithSelectedItem()) {
+      this.alignToSelectedItem();
+    } else {
+      this.finalizeAlignment();
+    }
+  }
+
+  private isNotAlignedWithSelectedItem(): boolean {
+    return this.index() !== this.selectedItemOffset();
+  }
+
+  private finalizeAlignment() {
+    this.showDialog.set(true);
+    this.openDialog();
+    this.enableButton.set(true);
+  }
+
+  private incrementSpeedCounter() {
+    this.counterForChangeSpeed.update((counter) => counter + 1);
   }
 
   private resetTransform(transformValue: string) {
@@ -212,108 +364,6 @@ export class SliderComponent implements OnInit {
     this.items().shift();
   }
 
-  private inItVariable() {
-    this.index.update((index) => index % this.itemsNumber());
-    this.incrementIndex();
-    this.enableButton.set(false);
-    this.counterForDoOneCycle.set(0);
-    this.speed.set(0.5);
-    this.counterForChangeSpeed.set(0);
-    this.selectedItemIndex.set(this.getRandomIndex());
-    this.isWinner.set(this.selectedItemIndex() === this.winningBlock());
-    this.dialogTitle.set(this.isWinner() ? 'Congratulations!' : 'Oops!');
-    this.selectedItemOffset.set(this.selectedItemIndex());
-    console.log('selected item: ' + this.selectedItemIndex());
-  }
-
-   start() {
-    this.inItVariable();
-    this.shiftAndAppendItem();
-    this.applyStyles();
-    this.performFullRotation();
-  }
-
-  private scheduleNextRotation() {
-    const start = performance.now();
-    const duration = this.speed() * 1500;
-
-    const animate = (timestamp: number) => {
-      const elapsed = timestamp - start;
-
-      if (elapsed >= duration) {
-        if (this.counterForDoOneCycle() === this.itemsNumber()) {
-          this.counterForChangeSpeed.set(0);
-          this.index.update((index) => index % this.itemsNumber());
-          if (this.selectedItemIndex() <= this.index()) {
-            this.selectedItemOffset.set(
-              this.selectedItemIndex() + this.itemsNumber()
-            );
-          }
-          this.differenceBetweenRightAndSelected.set(
-            Math.round((this.selectedItemOffset() - this.index()) / 10)
-          );
-          this.alignToSelectedItem();
-          return;
-        }
-
-        this.counterForDoOneCycle.update((i) => i + 1);
-
-        if (
-          this.counterForChangeSpeed() === Math.round(this.itemsNumber() / 10)
-        ) {
-          this.counterForChangeSpeed.set(0);
-          this.speed.update((i) =>
-            Math.max(this.maxSpeed(), i - this.stepSpeed())
-          );
-        }
-
-        this.counterForChangeSpeed.update((i) => i + 1);
-        this.move();
-      } else {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }
-
-  private move() {
-    this.incrementIndex();
-    this.shiftAndAppendItem();
-    this.applyStyles();
-    this.performFullRotation();
-  }
-
-  private performFullRotation() {
-    const transformValue = this.calculateTransformValue(
-      this.currentIndex() + 1
-    );
-    this.applyTransform(transformValue);
-    this.scheduleTransformReset();
-    this.scheduleNextRotation();
-  }
-
-  private scheduleTransformReset() {
-    const start = performance.now();
-    const duration = this.speed() * 1000;
-
-    const animate = (timestamp: number) => {
-      const elapsed = timestamp - start;
-
-      if (elapsed >= duration) {
-        const resetTransformValue = this.calculateTransformValue(
-          this.currentIndex()
-        );
-        this.resetTransform(resetTransformValue);
-        this.removeFirstItem();
-      } else {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }
-
   private getRandomIndex(): number {
     return (
       (Math.floor(Math.random() * 10) + this.winningBlock()) %
@@ -321,7 +371,8 @@ export class SliderComponent implements OnInit {
     );
   }
 
-   isCenterItem(index: number): boolean {
+  //green  for ceneter item in the view ====================
+  isCenterItem(index: number): boolean {
     const centerIndex = this.calculateCenterIndex();
     const currentCenterIndex = this.getCurrentCenterIndex();
     return this.isItemAtCenter(index, currentCenterIndex, centerIndex);
@@ -357,13 +408,14 @@ export class SliderComponent implements OnInit {
     }
     return index === currentCenterIndex;
   }
+  //green dialog =======================================
 
-   closeDialog() {
+  closeDialog() {
     this.showDialog.set(false);
     const dialog = this.dialog()?.nativeElement;
     dialog.close();
   }
-   openDialog() {
+  openDialog() {
     const dialog = this.dialog()?.nativeElement;
     dialog.showModal();
   }
