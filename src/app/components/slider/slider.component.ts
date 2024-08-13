@@ -36,9 +36,9 @@ export class SliderComponent implements OnInit {
 
     public carouselService: CarouselService
   ) {
-    // effect(() => {
-    //   this.showDialog() ? this.openDialog() : this.closeDialog();
-    // });
+    effect(() => {
+      this.showDialog() ? this.openDialog() : this.closeDialog();
+    });
   }
 
   ngOnInit() {
