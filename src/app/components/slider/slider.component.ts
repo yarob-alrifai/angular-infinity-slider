@@ -51,6 +51,11 @@ export class SliderComponent implements OnInit {
     );
   }
 
+  start() {
+    this.carouselService.start();
+  }
+
+
   get getCarouselList(): HTMLElement {
     return this.carouselList()?.nativeElement as HTMLElement;
   }
@@ -59,9 +64,6 @@ export class SliderComponent implements OnInit {
     return this.dialog()?.nativeElement as HTMLDialogElement;
   }
 
-  start() {
-    this.carouselService.start();
-  }
 
   isCenterItem(index: number): boolean {
     return this.carouselService.isCenterItem(index);

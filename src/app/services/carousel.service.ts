@@ -1,13 +1,11 @@
 import {
-  ElementRef,
   Injectable,
   Renderer2,
   signal,
-  viewChild,
 } from '@angular/core';
 import { Item } from '../core/interfaces/item';
-import { DialogService } from './dialog.service';
-import { sign } from 'crypto';
+
+
 
 @Injectable({
   providedIn: 'root',
@@ -39,7 +37,7 @@ export class CarouselService {
   renderer: Renderer2 | undefined;
   showDialog = signal<boolean>(false); //To show dialog and show message when stop
 
-  constructor(private dialogService: DialogService) {}
+  constructor() {}
 
   initCarousel(
     carouselList: HTMLElement,
