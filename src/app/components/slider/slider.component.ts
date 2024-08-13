@@ -33,12 +33,12 @@ export class SliderComponent implements OnInit {
 
   constructor(
     private renderer: Renderer2,
-    private dialogService: DialogService,
+
     public carouselService: CarouselService
   ) {
-    effect(() => {
-      this.showDialog() ? this.openDialog() : this.closeDialog();
-    });
+    // effect(() => {
+    //   this.showDialog() ? this.openDialog() : this.closeDialog();
+    // });
   }
 
   ngOnInit() {
@@ -57,11 +57,7 @@ export class SliderComponent implements OnInit {
 
 
   get getCarouselList(): HTMLElement {
-    return this.carouselList()?.nativeElement as HTMLElement;
-  }
-
-  get dialogElement(): HTMLDialogElement {
-    return this.dialog()?.nativeElement as HTMLDialogElement;
+    return this.carouselList()?.nativeElement;
   }
 
 
@@ -70,9 +66,9 @@ export class SliderComponent implements OnInit {
   }
 
   closeDialog() {
-    this.dialogService.closeDialog(this.dialogElement)
+    this.dialog()?.nativeElement.close();
   }
   openDialog() {
-    this.dialogService.openDialog(this.dialogElement)
+    this.dialog()?.nativeElement.showModal();
   }
 }

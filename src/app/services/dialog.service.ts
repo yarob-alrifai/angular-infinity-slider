@@ -6,12 +6,5 @@ import { Injectable } from '@angular/core';
 export class DialogService {
 
 
-  openDialog(dialog: HTMLDialogElement) {
-    dialog.showModal();
-  }
 
-  closeDialog(dialog: HTMLDialogElement) {
-
-    dialog.close();
-  }
 }
